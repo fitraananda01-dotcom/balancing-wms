@@ -19,9 +19,9 @@ from views.result_view import (
 
 st.set_page_config(
 
-    page_title="Balancing Fisik vs WMS",
+    page_title="Balancing FISIK VS FLUX WMS",
 
-    page_icon="📦",
+    page_icon="",
 
     layout="wide"
 
@@ -34,7 +34,7 @@ st.set_page_config(
 
 st.title(
 
-    "📦 Balancing Data Fisik vs WMS"
+    "Balancing FISIK VS FLUX WMS"
 
 )
 
@@ -58,7 +58,8 @@ with st.sidebar:
     st.info(
 
         """
-        Kunci pencocokan:
+        System ini di bangun oleh Fitra Ananda
+        Dengan kunci Pencocokan:
 
         • Nama
         • Produk
@@ -71,6 +72,8 @@ with st.sidebar:
         Booking Kode diambil
         dari data WMS untuk
         kebutuhan tracking.
+        
+        Semoga membantu
         """
 
     )
