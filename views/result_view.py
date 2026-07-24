@@ -1,8 +1,7 @@
 import streamlit as st
 
 from services.matching_service import (
-    balancing_data,
-    find_product_difference
+    balance_data
 )
 
 from services.export_service import (
@@ -21,6 +20,10 @@ def show_result_section(
     st.header(
         "📊 3. Hasil Balancing"
     )
+
+    # =====================================================
+    # CEK DATA
+    # =====================================================
 
     if fisik_clean is None or wms_clean is None:
 
@@ -48,23 +51,11 @@ def show_result_section(
 
     try:
 
-        hasil = balancing_data(
+        hasil = balance_data(
 
             fisik_clean,
 
             wms_clean
-
-        )
-
-        produk_berbeda = (
-
-            find_product_difference(
-
-                fisik_clean,
-
-                wms_clean
-
-            )
 
         )
 
@@ -73,6 +64,22 @@ def show_result_section(
         st.error(
 
             f"Gagal melakukan balancing: {e}"
+
+        )
+
+        st.exception(e)
+
+        return
+
+    # =====================================================
+    # CEK HASIL
+    # =====================================================
+
+    if hasil is None or hasil.empty:
+
+        st.warning(
+
+            "Tidak ada hasil balancing."
 
         )
 
@@ -92,10 +99,18 @@ def show_result_section(
 
     )
 
-    selisih = len(
+    selisih_qty = len(
 
         hasil[
             hasil["Status"] == "SELISIH QTY"
+        ]
+
+    )
+
+    selisih_produk = len(
+
+        hasil[
+            hasil["Status"] == "SELISIH PRODUK"
         ]
 
     )
@@ -116,31 +131,62 @@ def show_result_section(
 
     )
 
+    # =====================================================
+    # KPI BARIS 1
+    # =====================================================
+
     c1, c2, c3, c4, c5 = st.columns(5)
 
     c1.metric(
-        "Total",
+
+        "📊 Total",
+
         f"{total:,}"
+
     )
 
     c2.metric(
+
         "✅ Match",
+
         f"{match:,}"
+
     )
 
     c3.metric(
-        "🔴 Selisih",
-        f"{selisih:,}"
+
+        "🔴 Selisih Qty",
+
+        f"{selisih_qty:,}"
+
     )
 
     c4.metric(
-        "🟡 Hanya Fisik",
-        f"{hanya_fisik:,}"
+
+        "🟣 Selisih Produk",
+
+        f"{selisih_produk:,}"
+
     )
 
     c5.metric(
+
+        "🟡 Hanya Fisik",
+
+        f"{hanya_fisik:,}"
+
+    )
+
+    # =====================================================
+    # KPI BARIS 2
+    # =====================================================
+
+    st.metric(
+
         "🟠 Hanya WMS",
+
         f"{hanya_wms:,}"
+
     )
 
     # =====================================================
@@ -150,32 +196,30 @@ def show_result_section(
     st.divider()
 
     st.subheader(
+
         "🔎 Filter Hasil"
+
+    )
+
+    status_options = sorted(
+
+        hasil["Status"]
+
+        .dropna()
+
+        .unique()
+
+        .tolist()
+
     )
 
     status_filter = st.multiselect(
 
         "Status",
 
-        sorted(
+        status_options,
 
-            hasil["Status"]
-
-            .unique()
-
-            .tolist()
-
-        ),
-
-        default=sorted(
-
-            hasil["Status"]
-
-            .unique()
-
-            .tolist()
-
-        )
+        default=status_options
 
     )
 
@@ -207,6 +251,8 @@ def show_result_section(
 
             hasil_filter["Nama"]
 
+            .astype(str)
+
             .str.contains(
 
                 search_nama,
@@ -220,14 +266,102 @@ def show_result_section(
         ]
 
     # =====================================================
-    # SEARCH BOOKING
+    # SEARCH PRODUK
+    # =====================================================
+
+    search_produk = st.text_input(
+
+        "🔍 Cari Produk",
+
+        placeholder="Masukkan nama produk..."
+
+    )
+
+    if search_produk:
+
+        hasil_filter = hasil_filter[
+
+            hasil_filter["Produk"]
+
+            .astype(str)
+
+            .str.contains(
+
+                search_produk,
+
+                case=False,
+
+                na=False
+
+            )
+
+        ]
+
+    # =====================================================
+    # SEARCH MOVEMENT
+    # =====================================================
+
+    search_movement = st.text_input(
+
+        "🔍 Cari Movement Code / DN",
+
+        placeholder="Masukkan Movement Code / DN..."
+
+    )
+
+    if search_movement:
+
+        hasil_filter = hasil_filter[
+
+            (
+
+                hasil_filter["Movement Fisik"]
+
+                .astype(str)
+
+                .str.contains(
+
+                    search_movement,
+
+                    case=False,
+
+                    na=False
+
+                )
+
+            )
+
+            |
+
+            (
+
+                hasil_filter["Movement WMS"]
+
+                .astype(str)
+
+                .str.contains(
+
+                    search_movement,
+
+                    case=False,
+
+                    na=False
+
+                )
+
+            )
+
+        ]
+
+    # =====================================================
+    # SEARCH BOOKING CODE
     # =====================================================
 
     search_booking = st.text_input(
 
-        "🔍 Cari Booking Kode",
+        "🔍 Cari Booking Code",
 
-        placeholder="Masukkan Booking Kode..."
+        placeholder="Masukkan Booking Code..."
 
     )
 
@@ -235,7 +369,9 @@ def show_result_section(
 
         hasil_filter = hasil_filter[
 
-            hasil_filter["Booking Kode"]
+            hasil_filter["Booking Code"]
+
+            .astype(str)
 
             .str.contains(
 
@@ -249,11 +385,75 @@ def show_result_section(
 
         ]
 
+    # =====================================================
+    # SEARCH PLAN TYPE
+    # =====================================================
+
+    search_plan = st.text_input(
+
+        "🔍 Cari Plan Type",
+
+        placeholder="Masukkan Plan Type..."
+
+    )
+
+    if search_plan:
+
+        hasil_filter = hasil_filter[
+
+            (
+
+                hasil_filter["Plan Type Fisik"]
+
+                .astype(str)
+
+                .str.contains(
+
+                    search_plan,
+
+                    case=False,
+
+                    na=False
+
+                )
+
+            )
+
+            |
+
+            (
+
+                hasil_filter["Plan Type WMS"]
+
+                .astype(str)
+
+                .str.contains(
+
+                    search_plan,
+
+                    case=False,
+
+                    na=False
+
+                )
+
+            )
+
+        ]
+
+    # =====================================================
+    # JUMLAH HASIL
+    # =====================================================
+
     st.write(
 
         f"Menampilkan **{len(hasil_filter):,}** data."
 
     )
+
+    # =====================================================
+    # TABEL HASIL
+    # =====================================================
 
     st.dataframe(
 
@@ -266,75 +466,113 @@ def show_result_section(
     )
 
     # =====================================================
-    # PRODUK BERBEDA
+    # RINGKASAN JENIS MASALAH
     # =====================================================
 
     st.divider()
 
     st.subheader(
 
-        "⚠️ Tracking Produk Berbeda"
+        "📋 Ringkasan Jenis Masalah"
 
     )
 
-    if produk_berbeda.empty:
+    if "Jenis Masalah" in hasil.columns:
 
-        st.success(
+        ringkasan = (
 
-            "Tidak ditemukan kemungkinan produk berbeda."
+            hasil[
 
-        )
+                "Jenis Masalah"
 
-    else:
+            ]
 
-        st.warning(
+            .value_counts()
 
-            f"Ditemukan "
-            f"{len(produk_berbeda):,} "
-            f"kemungkinan produk berbeda."
+            .reset_index()
 
         )
+
+        ringkasan.columns = [
+
+            "Jenis Masalah",
+
+            "Jumlah"
+
+        ]
 
         st.dataframe(
 
-            produk_berbeda,
+            ringkasan,
 
             use_container_width=True,
 
-            height=400
+            hide_index=True
 
         )
 
     # =====================================================
-    # EXPORT
+    # EXPORT EXCEL
     # =====================================================
 
     st.divider()
 
-    excel_output = export_to_excel(
+    st.subheader(
 
-        hasil,
-
-        produk_berbeda
+        "📥 Export Hasil"
 
     )
 
-    st.download_button(
+    try:
 
-        "⬇️ Download Hasil Balancing Excel",
+        # Tidak lagi menggunakan
+        # find_product_difference
+        #
+        # Karena hasil balance_data()
+        # sudah menangani:
+        #
+        # MATCH
+        # SELISIH QTY
+        # SELISIH PRODUK
+        # HANYA FISIK
+        # HANYA WMS
 
-        data=excel_output,
+        excel_output = export_to_excel(
 
-        file_name="hasil_balancing_wms.xlsx",
+            hasil
 
-        mime=(
+        )
 
-            "application/vnd.openxmlformats-officedocument"
+        st.download_button(
 
-            ".spreadsheetml.sheet"
+            "⬇️ Download Hasil Balancing Excel",
 
-        ),
+            data=excel_output,
 
-        use_container_width=True
+            file_name=(
 
-    )
+                "hasil_balancing_wms.xlsx"
+
+            ),
+
+            mime=(
+
+                "application/vnd.openxmlformats-officedocument"
+
+                ".spreadsheetml.sheet"
+
+            ),
+
+            use_container_width=True
+
+        )
+
+    except Exception as e:
+
+        st.error(
+
+            f"Gagal membuat file Excel: {e}"
+
+        )
+
+        st.exception(e)

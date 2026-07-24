@@ -2,42 +2,35 @@ import pandas as pd
 
 
 # =========================================================
-# NORMALISASI TEKS
+# HELPER
 # =========================================================
 
-def normalize_text(series):
-    """
-    Membersihkan teks agar lebih mudah dicocokkan.
-    """
+def clean_text(value):
+    if pd.isna(value):
+        return ""
 
-    return (
-        series
-        .fillna("")
-        .astype(str)
-        .str.strip()
-        .str.upper()
-        .str.replace(r"\s+", " ", regex=True)
-    )
+    return str(value).strip()
 
 
-# =========================================================
-# NORMALISASI QTY
-# =========================================================
+def clean_qty(value):
+    if pd.isna(value) or value == "":
+        return 0.0
 
-def normalize_qty(series):
-    """
-    Mengubah Qty menjadi angka.
-    Nilai yang tidak valid dianggap 0.
-    """
-
-    return pd.to_numeric(
-        series,
-        errors="coerce"
-    ).fillna(0)
+    try:
+        return float(value)
+    except:
+        try:
+            return float(
+                str(value)
+                .replace(",", "")
+                .strip()
+            )
+        except:
+            return 0.0
 
 
 # =========================================================
-# PREPARE FISIK NORMAL
+# PREPARE DATA FISIK
 # =========================================================
 
 def prepare_fisik_normal(
@@ -46,156 +39,52 @@ def prepare_fisik_normal(
     produk_col,
     qty_col,
     movement_col,
-    type_col
+    plan_type_col
 ):
-    """
-    Format Normal:
-
-    Nama
-    Produk
-    Qty
-    Movement
-    Tipe Transaksi
-    """
 
     result = pd.DataFrame()
 
-    result["Nama"] = normalize_text(
+    result["Nama"] = (
         df[nama_col]
+        .apply(clean_text)
     )
 
-    result["Produk"] = normalize_text(
+    result["Produk"] = (
         df[produk_col]
+        .apply(clean_text)
     )
 
-    result["Qty"] = normalize_qty(
+    result["Qty"] = (
         df[qty_col]
+        .apply(clean_qty)
     )
 
-    result["Kode Movement"] = normalize_text(
+    result["Movement"] = (
         df[movement_col]
+        .apply(clean_text)
     )
 
-    result["Tipe Transaksi"] = normalize_text(
-        df[type_col]
+    result["Plan Type"] = (
+        df[plan_type_col]
+        .apply(clean_text)
     )
 
-    if "Source Sheet" in df.columns:
-
-        result["Source Sheet"] = (
-            df["Source Sheet"]
-            .fillna("-")
-            .astype(str)
+    result = result[
+        ~(
+            (result["Nama"] == "")
+            &
+            (result["Produk"] == "")
+            &
+            (result["Qty"] == 0)
         )
+    ].copy()
 
-    else:
-
-        result["Source Sheet"] = "-"
+    result.reset_index(
+        drop=True,
+        inplace=True
+    )
 
     return result
-
-
-# =========================================================
-# PREPARE FISIK MATRIKS
-# =========================================================
-
-def prepare_fisik_matrix(
-    df,
-    nama_col,
-    movement_col,
-    type_value="OUTBOUND",
-    remove_zero=True
-):
-    """
-    Mengubah format matriks menjadi format transaksi.
-
-    Contoh:
-
-    Nama       DN       Produk A    Produk B    Produk C
-    Budi       DN001    10          20          0
-
-    Menjadi:
-
-    Nama       Produk     Qty
-    Budi       Produk A   10
-    Budi       Produk B   20
-
-    Movement dari kolom DN.
-    """
-
-    result_rows = []
-
-    # Kolom yang bukan metadata dianggap sebagai produk
-    excluded_columns = {
-        nama_col,
-        movement_col,
-        "Source Sheet"
-    }
-
-    product_columns = [
-        col
-        for col in df.columns
-        if col not in excluded_columns
-    ]
-
-    for _, row in df.iterrows():
-
-        nama = str(
-            row.get(nama_col, "")
-        ).strip()
-
-        movement = str(
-            row.get(movement_col, "")
-        ).strip()
-
-        source_sheet = str(
-            row.get("Source Sheet", "-")
-        )
-
-        for product_col in product_columns:
-
-            qty = pd.to_numeric(
-                row.get(product_col, 0),
-                errors="coerce"
-            )
-
-            if pd.isna(qty):
-                qty = 0
-
-            if remove_zero and qty == 0:
-                continue
-
-            result_rows.append(
-                {
-                    "Nama": nama.upper(),
-                    "Produk": str(
-                        product_col
-                    ).strip().upper(),
-                    "Qty": qty,
-                    "Kode Movement": movement.upper(),
-                    "Tipe Transaksi": str(
-                        type_value
-                    ).strip().upper(),
-                    "Source Sheet": source_sheet
-                }
-            )
-
-    if not result_rows:
-
-        return pd.DataFrame(
-            columns=[
-                "Nama",
-                "Produk",
-                "Qty",
-                "Kode Movement",
-                "Tipe Transaksi",
-                "Source Sheet"
-            ]
-        )
-
-    return pd.DataFrame(
-        result_rows
-    )
 
 
 # =========================================================
@@ -208,508 +97,666 @@ def prepare_wms_data(
     produk_col,
     qty_col,
     movement_col,
-    type_col,
-    booking_col
+    booking_col,
+    plan_type_col
 ):
-    """
-    Menyiapkan data WMS.
-
-    Booking Kode hanya ada di WMS.
-    """
 
     result = pd.DataFrame()
 
-    result["Nama"] = normalize_text(
+    result["Nama"] = (
         df[nama_col]
+        .apply(clean_text)
     )
 
-    result["Produk"] = normalize_text(
+    result["Produk"] = (
         df[produk_col]
+        .apply(clean_text)
     )
 
-    result["Qty"] = normalize_qty(
+    result["Qty"] = (
         df[qty_col]
+        .apply(clean_qty)
     )
 
-    result["Kode Movement"] = normalize_text(
+    result["Movement"] = (
         df[movement_col]
+        .apply(clean_text)
     )
 
-    result["Tipe Transaksi"] = normalize_text(
-        df[type_col]
-    )
-
-    result["Booking Kode"] = normalize_text(
+    result["Booking Code"] = (
         df[booking_col]
+        .apply(clean_text)
     )
 
-    if "Source Sheet" in df.columns:
+    result["Plan Type"] = (
+        df[plan_type_col]
+        .apply(clean_text)
+    )
 
-        result["Source Sheet"] = (
-            df["Source Sheet"]
-            .fillna("-")
-            .astype(str)
+    result = result[
+        ~(
+            (result["Nama"] == "")
+            &
+            (result["Produk"] == "")
+            &
+            (result["Qty"] == 0)
         )
+    ].copy()
 
-    else:
-
-        result["Source Sheet"] = "-"
+    result.reset_index(
+        drop=True,
+        inplace=True
+    )
 
     return result
 
 
 # =========================================================
-# BALANCING UTAMA
+# HASIL PLAN TYPE
 # =========================================================
 
-def balancing_data(
+def get_plan_type_result(
+    plan_fisik,
+    plan_wms
+):
+
+    plan_fisik = clean_text(
+        plan_fisik
+    )
+
+    plan_wms = clean_text(
+        plan_wms
+    )
+
+    if (
+        plan_fisik != ""
+        and
+        plan_wms != ""
+        and
+        plan_fisik == plan_wms
+    ):
+        return plan_fisik
+
+    return "-"
+
+
+# =========================================================
+# BALANCING
+# =========================================================
+
+def balance_data(
     fisik,
     wms
 ):
-    """
-    Logika utama balancing.
 
-    ATURAN:
+    fisik = fisik.copy()
 
-    1. Nama + Produk + Qty sama
-       -> MATCH
+    wms = wms.copy()
 
-    2. Movement fisik kosong
-       tidak membuat transaksi gagal MATCH.
-
-    3. Jika data WMS ditemukan
-       dan movement WMS ada,
-       Booking Kode ditampilkan.
-
-    4. Produk sama tetapi Qty berbeda
-       -> SELISIH QTY
-
-    5. Nama sama tetapi Produk berbeda
-       -> SELISIH PRODUK
-
-    6. Hanya ada di Fisik
-       -> HANYA FISIK
-       -> BELUM NAIK WMS
-
-    7. Hanya ada di WMS
-       -> HANYA WMS
-       -> BELUM INPUT FISIK
-    """
-
-    if fisik is None:
-        fisik = pd.DataFrame()
-
-    if wms is None:
-        wms = pd.DataFrame()
-
-    # =====================================================
-    # AGREGASI DATA
-    # =====================================================
-
-    fisik_grouped = (
-        fisik
-        .groupby(
-            [
-                "Nama",
-                "Produk"
-            ],
-            as_index=False
-        )
-        .agg(
-            Qty_Fisik=(
-                "Qty",
-                "sum"
-            ),
-            Movement_Fisik=(
-                "Kode Movement",
-                lambda x: ", ".join(
-                    sorted(
-                        set(
-                            str(v)
-                            for v in x
-                            if str(v).strip()
-                        )
-                    )
-                )
-            ),
-            Sheet_Fisik=(
-                "Source Sheet",
-                lambda x: ", ".join(
-                    sorted(
-                        set(
-                            str(v)
-                            for v in x
-                        )
-                    )
-                )
-            )
-        )
+    fisik.reset_index(
+        drop=True,
+        inplace=True
     )
 
-    wms_grouped = (
-        wms
-        .groupby(
-            [
-                "Nama",
-                "Produk"
-            ],
-            as_index=False
-        )
-        .agg(
-            Qty_WMS=(
-                "Qty",
-                "sum"
-            ),
-            Movement_WMS=(
-                "Kode Movement",
-                lambda x: ", ".join(
-                    sorted(
-                        set(
-                            str(v)
-                            for v in x
-                            if str(v).strip()
-                        )
-                    )
-                )
-            ),
-            Booking_Kode=(
-                "Booking Kode",
-                lambda x: ", ".join(
-                    sorted(
-                        set(
-                            str(v)
-                            for v in x
-                            if str(v).strip()
-                        )
-                    )
-                )
-            ),
-            Sheet_WMS=(
-                "Source Sheet",
-                lambda x: ", ".join(
-                    sorted(
-                        set(
-                            str(v)
-                            for v in x
-                        )
-                    )
-                )
-            )
-        )
+    wms.reset_index(
+        drop=True,
+        inplace=True
     )
 
-    # =====================================================
-    # MERGE BERDASARKAN NAMA + PRODUK
-    # =====================================================
+    fisik["_used"] = False
 
-    result = pd.merge(
+    wms["_used"] = False
 
-        fisik_grouped,
+    hasil = []
 
-        wms_grouped,
-
-        on=[
-            "Nama",
-            "Produk"
-        ],
-
-        how="outer"
-
-    )
 
     # =====================================================
-    # ISI NILAI KOSONG
+    # BUAT HASIL
     # =====================================================
 
-    result["Qty_Fisik"] = (
-        result["Qty_Fisik"]
-        .fillna(0)
-    )
+    def add_result(
+        nama,
+        produk_fisik,
+        qty_fisik,
+        movement_fisik,
+        plan_fisik,
+        produk_wms,
+        qty_wms,
+        movement_wms,
+        booking_code,
+        plan_wms,
+        status,
+        jenis_masalah,
+        catatan
+    ):
 
-    result["Qty_WMS"] = (
-        result["Qty_WMS"]
-        .fillna(0)
-    )
+        hasil.append({
 
-    for col in [
-        "Movement_Fisik",
-        "Movement_WMS",
-        "Booking_Kode",
-        "Sheet_Fisik",
-        "Sheet_WMS"
-    ]:
+            "Nama":
+                nama,
 
-        result[col] = (
-            result[col]
-            .fillna("")
-            .astype(str)
-        )
+            "Produk":
+                produk_fisik,
+
+            "Qty Fisik":
+                qty_fisik,
+
+            "Qty WMS":
+                qty_wms,
+
+            "Selisih Qty":
+                qty_fisik - qty_wms,
+
+            "Movement Fisik":
+                movement_fisik,
+
+            "Movement WMS":
+                movement_wms,
+
+            "Booking Code":
+                booking_code,
+
+            "Plan Type Fisik":
+                plan_fisik,
+
+            "Plan Type WMS":
+                plan_wms,
+
+            "Plan Type Hasil":
+                get_plan_type_result(
+                    plan_fisik,
+                    plan_wms
+                ),
+
+            "Status":
+                status,
+
+            "Jenis Masalah":
+                jenis_masalah,
+
+            "Catatan":
+                catatan
+        })
+
 
     # =====================================================
-    # SELISIH QTY
+    # 1. CARI MATCH EXACT
+    #
+    # NAMA + PRODUK + QTY
+    #
+    # Movement hanya prioritas
     # =====================================================
 
-    result["Selisih_Qty"] = (
-        result["Qty_Fisik"]
-        -
-        result["Qty_WMS"]
-    )
+    for f_idx, f in fisik.iterrows():
 
-    # =====================================================
-    # STATUS DAN JENIS MASALAH
-    # =====================================================
+        kandidat = wms[
 
-    statuses = []
-    problems = []
+            (wms["_used"] == False)
 
-    for _, row in result.iterrows():
+            &
 
-        qty_fisik = row["Qty_Fisik"]
+            (wms["Nama"] == f["Nama"])
 
-        qty_wms = row["Qty_WMS"]
+            &
 
-        movement_wms = (
-            row["Movement_WMS"]
-            .strip()
-        )
+            (wms["Produk"] == f["Produk"])
 
-        # -----------------------------------------------
-        # 1. FISIK ADA + WMS ADA
-        # -----------------------------------------------
+            &
 
-        if (
-            qty_fisik != 0
-            and
-            qty_wms != 0
-        ):
+            (wms["Qty"] == f["Qty"])
 
-            if qty_fisik == qty_wms:
+        ]
 
-                status = "MATCH"
 
-                # Movement fisik boleh kosong.
-                # Jika WMS punya movement,
-                # transaksi dianggap sudah naik WMS.
+        if kandidat.empty:
 
-                if movement_wms:
+            continue
 
-                    problem = (
-                        "TIDAK ADA MASALAH"
-                    )
 
-                else:
+        # =================================================
+        # PRIORITAS 1
+        # MOVEMENT SAMA
+        # =================================================
 
-                    problem = (
-                        "BELUM NAIK WMS"
-                    )
+        if f["Movement"] != "":
+
+            kandidat_sama = kandidat[
+
+                kandidat["Movement"]
+
+                ==
+
+                f["Movement"]
+
+            ]
+
+            if not kandidat_sama.empty:
+
+                w_idx = kandidat_sama.index[0]
 
             else:
 
-                status = "SELISIH QTY"
+                w_idx = kandidat.index[0]
 
-                problem = (
-                    "SELISIH QTY"
-                )
+        else:
 
-        # -----------------------------------------------
-        # 2. HANYA FISIK
-        # -----------------------------------------------
+            # =================================================
+            # MOVEMENT FISIK KOSONG
+            # CARI BERDASARKAN NAMA + PRODUK + QTY
+            # =================================================
 
-        elif (
-            qty_fisik != 0
+            w_idx = kandidat.index[0]
+
+
+        w = wms.loc[w_idx]
+
+
+        # Tandai sudah digunakan
+
+        fisik.at[
+            f_idx,
+            "_used"
+        ] = True
+
+        wms.at[
+            w_idx,
+            "_used"
+        ] = True
+
+
+        movement_fisik = f["Movement"]
+
+        movement_wms = w["Movement"]
+
+
+        # =================================================
+        # TENTUKAN MOVEMENT
+        # =================================================
+
+        if (
+
+            movement_fisik != ""
+
             and
-            qty_wms == 0
+
+            movement_wms != ""
+
+            and
+
+            movement_fisik
+            !=
+            movement_wms
+
         ):
 
-            status = "HANYA FISIK"
-
-            problem = (
-                "BELUM NAIK WMS"
+            jenis_masalah = (
+                "MOVEMENT BERBEDA"
             )
 
-        # -----------------------------------------------
-        # 3. HANYA WMS
-        # -----------------------------------------------
-
-        elif (
-            qty_fisik == 0
-            and
-            qty_wms != 0
-        ):
-
-            status = "HANYA WMS"
-
-            problem = (
-                "BELUM INPUT FISIK"
+            catatan = (
+                "Nama + Produk + Qty "
+                "cocok 100%, tetapi "
+                "Movement berbeda."
             )
 
         else:
 
-            status = "TIDAK DIKETAHUI"
+            jenis_masalah = (
+                "TIDAK ADA MASALAH"
+            )
 
-            problem = "-"
+            catatan = (
+                "Nama + Produk + Qty "
+                "cocok 100%."
+            )
 
-        statuses.append(
-            status
+
+        add_result(
+
+            f["Nama"],
+
+            f["Produk"],
+
+            f["Qty"],
+
+            movement_fisik,
+
+            f["Plan Type"],
+
+            w["Produk"],
+
+            w["Qty"],
+
+            movement_wms,
+
+            w["Booking Code"],
+
+            w["Plan Type"],
+
+            "MATCH",
+
+            jenis_masalah,
+
+            catatan
+
         )
 
-        problems.append(
-            problem
-        )
-
-    result["Status"] = statuses
-
-    result["Jenis Masalah"] = problems
 
     # =====================================================
-    # DETEKSI SELISIH PRODUK
+    # 2. DATA FISIK YANG BELUM MATCH
     # =====================================================
 
-    # Cari nama yang ada di Fisik dan WMS,
-    # tetapi produknya berbeda.
+    fisik_sisa = fisik[
 
-    fisik_names = set(
-        fisik["Nama"]
-        .unique()
-    )
+        fisik["_used"] == False
 
-    wms_names = set(
-        wms["Nama"]
-        .unique()
-    )
-
-    common_names = (
-        fisik_names
-        &
-        wms_names
-    )
-
-    for idx, row in result.iterrows():
-
-        nama = row["Nama"]
-
-        status = row["Status"]
-
-        if nama not in common_names:
-            continue
-
-        if status not in [
-            "HANYA FISIK",
-            "HANYA WMS"
-        ]:
-            continue
-
-        fisik_products = set(
-            fisik[
-                fisik["Nama"]
-                == nama
-            ]["Produk"]
-        )
-
-        wms_products = set(
-            wms[
-                wms["Nama"]
-                == nama
-            ]["Produk"]
-        )
-
-        current_product = row[
-            "Produk"
-        ]
-
-        # Produk fisik tidak ada di WMS
-        if (
-            status == "HANYA FISIK"
-            and
-            current_product
-            not in wms_products
-        ):
-
-            result.at[
-                idx,
-                "Jenis Masalah"
-            ] = "SELISIH PRODUK"
-
-        # Produk WMS tidak ada di fisik
-        elif (
-            status == "HANYA WMS"
-            and
-            current_product
-            not in fisik_products
-        ):
-
-            result.at[
-                idx,
-                "Jenis Masalah"
-            ] = "SELISIH PRODUK"
-
-    # =====================================================
-    # URUTKAN KOLOM
-    # =====================================================
-
-    result = result[
-        [
-            "Nama",
-            "Produk",
-            "Qty_Fisik",
-            "Qty_WMS",
-            "Selisih_Qty",
-            "Movement_Fisik",
-            "Movement_WMS",
-            "Booking_Kode",
-            "Sheet_Fisik",
-            "Sheet_WMS",
-            "Status",
-            "Jenis Masalah"
-        ]
     ]
 
-    # Rename supaya tampilan lebih rapi
 
-    result = result.rename(
-        columns={
-            "Qty_Fisik":
-                "Qty Fisik",
+    for f_idx, f in fisik_sisa.iterrows():
 
-            "Qty_WMS":
-                "Qty WMS",
 
-            "Selisih_Qty":
-                "Selisih",
+        # =================================================
+        # CARI NAMA + PRODUK
+        # QTY BOLEH BERBEDA
+        # =================================================
 
-            "Movement_Fisik":
-                "Movement Fisik",
+        kandidat_qty = wms[
 
-            "Movement_WMS":
-                "Movement WMS",
+            (wms["_used"] == False)
 
-            "Booking_Kode":
-                "Booking Kode",
+            &
 
-            "Sheet_Fisik":
-                "Sheet Fisik",
+            (wms["Nama"] == f["Nama"])
 
-            "Sheet_WMS":
-                "Sheet WMS"
-        }
+            &
+
+            (wms["Produk"] == f["Produk"])
+
+        ]
+
+
+        if not kandidat_qty.empty:
+
+
+            # Prioritas Movement sama
+
+            if f["Movement"] != "":
+
+                kandidat_movement = kandidat_qty[
+
+                    kandidat_qty["Movement"]
+
+                    ==
+
+                    f["Movement"]
+
+                ]
+
+                if not kandidat_movement.empty:
+
+                    w_idx = kandidat_movement.index[0]
+
+                else:
+
+                    w_idx = kandidat_qty.index[0]
+
+            else:
+
+                w_idx = kandidat_qty.index[0]
+
+
+            w = wms.loc[w_idx]
+
+
+            wms.at[
+
+                w_idx,
+
+                "_used"
+
+            ] = True
+
+
+            add_result(
+
+                f["Nama"],
+
+                f["Produk"],
+
+                f["Qty"],
+
+                f["Movement"],
+
+                f["Plan Type"],
+
+                w["Produk"],
+
+                w["Qty"],
+
+                w["Movement"],
+
+                w["Booking Code"],
+
+                w["Plan Type"],
+
+                "SELISIH QTY",
+
+                "SELISIH QTY",
+
+                (
+                    "Nama + Produk sama, "
+                    "tetapi Qty berbeda."
+                )
+
+            )
+
+            continue
+
+
+        # =================================================
+        # CARI NAMA SAMA
+        # PRODUK BERBEDA
+        # =================================================
+
+        kandidat_produk = wms[
+
+            (wms["_used"] == False)
+
+            &
+
+            (wms["Nama"] == f["Nama"])
+
+        ]
+
+
+        if not kandidat_produk.empty:
+
+
+            if f["Movement"] != "":
+
+                kandidat_movement = kandidat_produk[
+
+                    kandidat_produk["Movement"]
+
+                    ==
+
+                    f["Movement"]
+
+                ]
+
+                if not kandidat_movement.empty:
+
+                    w_idx = kandidat_movement.index[0]
+
+                else:
+
+                    w_idx = kandidat_produk.index[0]
+
+            else:
+
+                w_idx = kandidat_produk.index[0]
+
+
+            w = wms.loc[w_idx]
+
+
+            wms.at[
+
+                w_idx,
+
+                "_used"
+
+            ] = True
+
+
+            add_result(
+
+                f["Nama"],
+
+                f["Produk"],
+
+                f["Qty"],
+
+                f["Movement"],
+
+                f["Plan Type"],
+
+                w["Produk"],
+
+                w["Qty"],
+
+                w["Movement"],
+
+                w["Booking Code"],
+
+                w["Plan Type"],
+
+                "SELISIH PRODUK",
+
+                "SELISIH PRODUK",
+
+                (
+                    "Nama sama, tetapi "
+                    "Produk berbeda."
+                )
+
+            )
+
+            continue
+
+
+        # =================================================
+        # HANYA FISIK
+        # =================================================
+
+        add_result(
+
+            f["Nama"],
+
+            f["Produk"],
+
+            f["Qty"],
+
+            f["Movement"],
+
+            f["Plan Type"],
+
+            "-",
+
+            0,
+
+            "-",
+
+            "-",
+
+            "-",
+
+            "HANYA FISIK",
+
+            "BELUM NAIK WMS",
+
+            (
+                "Transaksi ada di Fisik "
+                "tetapi tidak ditemukan "
+                "di WMS."
+            )
+
+        )
+
+
+    # =====================================================
+    # 3. DATA WMS YANG BELUM MATCH
+    # =====================================================
+
+    wms_sisa = wms[
+
+        wms["_used"] == False
+
+    ]
+
+
+    for _, w in wms_sisa.iterrows():
+
+        add_result(
+
+            w["Nama"],
+
+            "-",
+
+            0,
+
+            "-",
+
+            "-",
+
+            w["Produk"],
+
+            w["Qty"],
+
+            w["Movement"],
+
+            w["Booking Code"],
+
+            w["Plan Type"],
+
+            "HANYA WMS",
+
+            "BELUM INPUT FISIK",
+
+            (
+                "Transaksi ada di WMS "
+                "tetapi tidak ditemukan "
+                "di Fisik."
+            )
+
+        )
+
+
+    # =====================================================
+    # DATAFRAME
+    # =====================================================
+
+    result = pd.DataFrame(
+        hasil
     )
+
+
+    result.insert(
+
+        0,
+
+        "No",
+
+        range(
+
+            1,
+
+            len(result) + 1
+
+        )
+
+    )
+
 
     return result
-
-
-# =========================================================
-# FUNGSI TAMBAHAN
-# =========================================================
-
-def find_product_difference(
-    fisik,
-    wms
-):
-    """
-    Kompatibilitas dengan kode lama.
-    """
-
-    return balancing_data(
-        fisik,
-        wms
-    )

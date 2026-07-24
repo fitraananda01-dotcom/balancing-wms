@@ -2,15 +2,13 @@ import streamlit as st
 
 from services.matching_service import (
     prepare_fisik_normal,
-    prepare_fisik_matrix,
     prepare_wms_data
 )
 
 
 def show_mapping_section(
     fisik_data,
-    wms_data,
-    fisik_format
+    wms_data
 ):
 
     st.header(
@@ -46,108 +44,68 @@ def show_mapping_section(
     )
 
     st.info(
-        f"Format yang dipilih: **{fisik_format}**"
+        "Data Fisik menggunakan format vertikal."
     )
 
-    # =====================================================
-    # FORMAT NORMAL
-    # =====================================================
+    col1, col2 = st.columns(2)
 
-    if fisik_format == "Format Normal":
+    with col1:
 
-        col1, col2 = st.columns(2)
+        fisik_nama = st.selectbox(
 
-        with col1:
+            "Kolom Nama",
 
-            fisik_nama = st.selectbox(
-                "Kolom Nama",
-                fisik_data.columns,
-                key="normal_nama"
-            )
+            fisik_data.columns,
 
-            fisik_produk = st.selectbox(
-                "Kolom Produk",
-                fisik_data.columns,
-                key="normal_produk"
-            )
+            key="fisik_nama"
 
-            fisik_qty = st.selectbox(
-                "Kolom Qty",
-                fisik_data.columns,
-                key="normal_qty"
-            )
-
-        with col2:
-
-            fisik_movement = st.selectbox(
-                "Kolom Kode Movement",
-                fisik_data.columns,
-                key="normal_movement"
-            )
-
-            fisik_type = st.selectbox(
-                "Kolom Tipe Transaksi",
-                fisik_data.columns,
-                key="normal_type"
-            )
-
-    # =====================================================
-    # FORMAT MATRIKS
-    # =====================================================
-
-    else:
-
-        st.info(
-            """
-            Format Matriks digunakan jika:
-
-            • Nama orang berada ke bawah
-            • Nama produk berada ke samping
-            • DN / Movement Code berada di kolom
-            • Qty berada di dalam tabel
-            """
         )
 
-        col1, col2 = st.columns(2)
+        fisik_produk = st.selectbox(
 
-        with col1:
+            "Kolom Produk",
 
-            fisik_nama = st.selectbox(
-                "Kolom Nama",
-                fisik_data.columns,
-                key="matrix_nama"
-            )
+            fisik_data.columns,
 
-        with col2:
+            key="fisik_produk"
 
-            fisik_movement = st.selectbox(
-                "Kolom Kode Movement / DN",
-                fisik_data.columns,
-                key="matrix_movement"
-            )
-
-        fisik_type = st.text_input(
-            "Tipe Transaksi",
-            value="OUTBOUND",
-            key="matrix_type"
         )
 
-        remove_zero = st.checkbox(
-            "Abaikan Qty = 0",
-            value=True,
-            key="matrix_remove_zero"
+        fisik_qty = st.selectbox(
+
+            "Kolom Qty",
+
+            fisik_data.columns,
+
+            key="fisik_qty"
+
         )
 
-        st.caption(
-            """
-            Semua kolom selain:
-            Nama,
-            Movement / DN,
-            dan Source Sheet
+    with col2:
 
-            akan dianggap sebagai Produk.
-            """
+        fisik_movement = st.selectbox(
+
+            "Kolom Movement Code / DN",
+
+            fisik_data.columns,
+
+            key="fisik_movement"
+
         )
+
+        fisik_plan_type = st.selectbox(
+
+            "Kolom Plan Type",
+
+            fisik_data.columns,
+
+            key="fisik_plan_type"
+
+        )
+
+    st.caption(
+        "Movement Code / DN pada Data Fisik boleh kosong."
+    )
 
     # =====================================================
     # DATA WMS
@@ -164,44 +122,99 @@ def show_mapping_section(
     with col1:
 
         wms_nama = st.selectbox(
+
             "Kolom Nama",
+
             wms_data.columns,
+
             key="wms_nama"
+
         )
 
         wms_produk = st.selectbox(
+
             "Kolom Produk",
+
             wms_data.columns,
+
             key="wms_produk"
+
         )
 
     with col2:
 
         wms_qty = st.selectbox(
+
             "Kolom Qty",
+
             wms_data.columns,
+
             key="wms_qty"
+
         )
 
         wms_movement = st.selectbox(
-            "Kolom Kode Movement",
+
+            "Kolom Movement Code / DN",
+
             wms_data.columns,
+
             key="wms_movement"
+
         )
 
     with col3:
 
-        wms_type = st.selectbox(
-            "Kolom Tipe Transaksi",
+        wms_booking = st.selectbox(
+
+            "Kolom Booking Code",
+
             wms_data.columns,
-            key="wms_type"
+
+            key="wms_booking"
+
         )
 
-        wms_booking = st.selectbox(
-            "Kolom Booking Kode",
+        wms_plan_type = st.selectbox(
+
+            "Kolom Plan Type",
+
             wms_data.columns,
-            key="wms_booking"
+
+            key="wms_plan_type"
+
         )
+
+    # =====================================================
+    # INFORMASI LOGIKA
+    # =====================================================
+
+    st.divider()
+
+    st.subheader(
+        "📌 Logika Balancing"
+    )
+
+    st.info(
+        """
+        **MATCH ditentukan berdasarkan:**
+
+        Nama + Produk + Qty harus sama 100%.
+
+        **Movement Code / DN:**
+        Digunakan untuk mengidentifikasi dan tracking transaksi.
+        Movement bukan syarat wajib MATCH.
+
+        **Plan Type:**
+        Tidak menentukan MATCH.
+        Jika Plan Type Fisik dan WMS sama, akan ditampilkan.
+        Jika berbeda, hasil Plan Type akan menjadi "-".
+
+        **Booking Code:**
+        Diambil dari WMS dan ditampilkan pada hasil
+        untuk memudahkan tracking transaksi.
+        """
+    )
 
     # =====================================================
     # PROSES
@@ -209,61 +222,60 @@ def show_mapping_section(
 
     st.divider()
 
-    if st.button(
-        "🚀 PROSES DATA",
+    proses = st.button(
+
+        "🚀 PROSES BALANCING",
+
         type="primary",
+
         use_container_width=True
-    ):
+
+    )
+
+    if proses:
 
         try:
 
             # =============================================
-            # FISIK NORMAL
+            # PREPARE FISIK
             # =============================================
 
-            if fisik_format == "Format Normal":
+            fisik_clean = prepare_fisik_normal(
 
-                fisik_clean = (
-                    prepare_fisik_normal(
-                        fisik_data,
-                        fisik_nama,
-                        fisik_produk,
-                        fisik_qty,
-                        fisik_movement,
-                        fisik_type
-                    )
-                )
+                fisik_data,
 
-            # =============================================
-            # FISIK MATRIKS
-            # =============================================
+                fisik_nama,
 
-            else:
+                fisik_produk,
 
-                fisik_clean = (
-                    prepare_fisik_matrix(
-                        fisik_data,
-                        fisik_nama,
-                        fisik_movement,
-                        fisik_type,
-                        remove_zero
-                    )
-                )
+                fisik_qty,
+
+                fisik_movement,
+
+                fisik_plan_type
+
+            )
 
             # =============================================
-            # WMS
+            # PREPARE WMS
             # =============================================
 
-            wms_clean = (
-                prepare_wms_data(
-                    wms_data,
-                    wms_nama,
-                    wms_produk,
-                    wms_qty,
-                    wms_movement,
-                    wms_type,
-                    wms_booking
-                )
+            wms_clean = prepare_wms_data(
+
+                wms_data,
+
+                wms_nama,
+
+                wms_produk,
+
+                wms_qty,
+
+                wms_movement,
+
+                wms_booking,
+
+                wms_plan_type
+
             )
 
             # =============================================
@@ -279,64 +291,81 @@ def show_mapping_section(
             ] = wms_clean
 
             st.success(
-                "✅ Data Fisik dan WMS berhasil diproses."
+                "Data berhasil diproses dan siap untuk balancing."
             )
 
         except Exception as e:
 
             st.error(
-                f"❌ Gagal memproses data: {e}"
+                f"Gagal memproses data: {e}"
             )
 
+            st.exception(e)
+
     # =====================================================
-    # AMBIL SESSION
+    # AMBIL SESSION STATE
     # =====================================================
 
-    fisik_result = (
-        st.session_state.get(
-            "fisik_clean",
-            None
-        )
+    fisik_result = st.session_state.get(
+
+        "fisik_clean",
+
+        None
+
     )
 
-    wms_result = (
-        st.session_state.get(
-            "wms_clean",
-            None
-        )
+    wms_result = st.session_state.get(
+
+        "wms_clean",
+
+        None
+
     )
 
     # =====================================================
-    # PREVIEW FISIK
+    # PREVIEW DATA FISIK
     # =====================================================
 
     if fisik_result is not None:
 
         with st.expander(
-            "👁️ Preview Data Fisik Setelah Konversi"
+
+            "👁️ Preview Data Fisik"
+
         ):
 
             st.dataframe(
+
                 fisik_result.head(100),
+
                 use_container_width=True
+
             )
 
     # =====================================================
-    # PREVIEW WMS
+    # PREVIEW DATA WMS
     # =====================================================
 
     if wms_result is not None:
 
         with st.expander(
+
             "👁️ Preview Data WMS"
+
         ):
 
             st.dataframe(
+
                 wms_result.head(100),
+
                 use_container_width=True
+
             )
 
     return (
+
         fisik_result,
+
         wms_result
+
     )

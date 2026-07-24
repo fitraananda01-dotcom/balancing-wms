@@ -59,20 +59,22 @@ with st.sidebar:
 
         """
         System ini di bangun oleh Fitra Ananda
-        Dengan kunci Pencocokan:
+
+        Kunci pencocokan utama:
 
         • Nama
         • Produk
-        • Kode Movement
-        • Tipe Transaksi
+        • Qty
 
-        Qty digunakan untuk
-        menghitung selisih.
+        Movement Code / DN digunakan
+        untuk identifikasi dan tracking transaksi.
 
-        Booking Kode diambil
-        dari data WMS untuk
-        kebutuhan tracking.
-        
+        Plan Type tidak digunakan
+        sebagai penentu balancing.
+
+        Booking Code diambil dari WMS
+        untuk kebutuhan tracking.
+
         Semoga membantu
         """
 
@@ -81,6 +83,7 @@ with st.sidebar:
 
 # =========================================================
 # STEP 1
+# UPLOAD DATA
 # =========================================================
 
 fisik_data, wms_data, fisik_format = (
@@ -92,6 +95,7 @@ fisik_data, wms_data, fisik_format = (
 
 # =========================================================
 # STEP 2
+# MAPPING DATA
 # =========================================================
 
 fisik_clean = st.session_state.get(
@@ -127,9 +131,7 @@ if (
 
             fisik_data,
 
-            wms_data,
-
-            fisik_format
+            wms_data
 
         )
 
@@ -138,6 +140,7 @@ if (
 
 # =========================================================
 # STEP 3
+# HASIL BALANCING
 # =========================================================
 
 if (
